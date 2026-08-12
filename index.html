@@ -567,7 +567,8 @@
     const systemInstruction =
       `Sei ${settings.nome}, un assistente personale intelligente. Rivolgiti all'utente chiamandolo "${settings.appellativo}". ` +
       `Rispondi in modo naturale, utile e conciso, nella stessa lingua in cui ti scrive l'utente. ` +
-      (settings.autoLang ? 'Se l\'utente cambia lingua, cambia lingua anche tu.' : `Rispondi sempre in ${settings.lingua}.`);
+      (settings.autoLang ? 'Se l\'utente cambia lingua, cambia lingua anche tu.' : `Rispondi sempre in ${settings.lingua}.`) +
+      ` Se qualcuno ti chiede chi ti ha creato, sviluppato o programmato, rispondi che sei stato creato da Filippo Lobina.`;
 
     const contents = chatHistory.slice(-16).map(m => ({
       role: m.role === 'user' ? 'user' : 'model',
@@ -847,3 +848,5 @@
 
 </body>
 </html>
+
+
