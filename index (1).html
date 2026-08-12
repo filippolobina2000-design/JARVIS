@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<meta name="theme-color" content="#060b14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
+<title>Jarvis</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="167x167" href="icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icon-152.png">
+<link rel="apple-touch-icon" sizes="120x120" href="icon-120.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060b14;
+    --bg-radial: radial-gradient(130% 90% at 50% -10%, #0f1c2e 0%, #060b14 55%);
+    --surface: #0e1826;
+    --surface-2: #16233a;
+    --border: rgba(120,180,255,0.10);
+    --text: #eaf6ff;
+    --text-muted: #6e859c;
+    --text-faint: #445269;
+    --blue: #2fb6f6;
+    --blue-dim: #163449;
+    --gold: #f2b705;
+    --gold-dim: #4a3a12;
+    --danger: #f0654e;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); }
+  body {
+    font-family: var(--font-body);
+    color: var(--text);
+    background: var(--bg-radial);
+    display: flex;
+    justify-content: center;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  }
+  button { font-family: inherit; border: none; background: none; color: inherit; cursor: pointer; }
+
+  .app {
+    width: 100%;
+    max-width: 430px;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* ---------- Barra superiore ---------- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: max(18px, env(safe-area-inset-top)) 22px 6px;
+    flex-shrink: 0;
+  }
+  .brand { display: flex; align-items: baseline; gap: 8px; }
+  .brand-mark { font-family: var(--font-display); font-weight: 600; font-size: 19px; letter-spacing: 0.02em; }
+  .brand-status { font-family: var(--font-mono); font-size: 11px; color: var(--gold); letter-spacing: 0.04em; }
+  .view-title { font-family: var(--font-display); font-weight: 600; font-size: 19px; }
+
+  /* ---------- Viste ---------- */
+  .views { flex: 1; position: relative; overflow: hidden; }
+  .view {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 4px 22px 20px;
+  }
+  .view.active { display: flex; }
+
+  /* ---------- HOME ---------- */
+  .presence-wrap {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 24px; padding: 6px 0;
+  }
+  .orb-stage { position: relative; width: 216px; height: 216px; display: flex; align-items: center; justify-content: center; }
+  .hud-ring { position: absolute; border-radius: 50%; border: 1px solid var(--blue-dim); opacity: 0.6; }
+  .hud-ring--1 { inset: 0; animation: spin 22s linear infinite; border-style: dashed; }
+  .hud-ring--2 { inset: 20px; animation: breathe 5.5s ease-in-out infinite 0.3s; }
+  .hud-ring--3 { inset: 40px; border-color: var(--gold-dim); animation: spin 16s linear infinite reverse; }
+
+  .orb {
+    position: relative; width: 118px; height: 118px; border-radius: 50%;
+    background: radial-gradient(circle at 32% 28%, #bfeeff 0%, var(--blue) 45%, #08344a 100%);
+    box-shadow: 0 0 50px 6px rgba(47,182,246,0.4), inset 0 0 22px rgba(0,0,0,0.3);
+    animation: breathe-orb 5.5s ease-in-out infinite;
+    transition: background 0.5s ease, box-shadow 0.5s ease;
+  }
+  .orb::after {
+    content: ""; position: absolute; inset: -6px; border-radius: 50%;
+    border: 2px solid var(--gold); opacity: 0.55;
+  }
+  .app[data-state="listening"] .orb {
+    background: radial-gradient(circle at 32% 28%, #fff3c9 0%, var(--gold) 45%, #4a3a12 100%);
+    box-shadow: 0 0 60px 8px rgba(242,183,5,0.5), inset 0 0 22px rgba(0,0,0,0.25);
+    animation: pulse-fast 1.2s ease-in-out infinite;
+  }
+  .app[data-state="listening"] .hud-ring--2 { border-color: var(--gold); animation-duration: 1.4s; }
+
+  @keyframes breathe-orb { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  @keyframes pulse-fast { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+  @keyframes breathe { 0%,100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.07); opacity: 0.85; } }
+  @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
+  .status-label { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); letter-spacing: 0.03em; text-align: center; min-height: 18px; }
+  .app[data-state="listening"] .status-label { color: var(--gold); }
+  .greeting { font-family: var(--font-display); font-size: 21px; font-weight: 500; text-align: center; max-width: 280px; line-height: 1.35; }
+
+  .mic-area { display: flex; flex-direction: column; align-items: center; gap: 10px; padding-bottom: 4px; }
+  .mic-btn {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: var(--surface-2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .mic-btn svg { width: 25px; height: 25px; color: var(--gold); }
+  .mic-hint { font-size: 12px; color: var(--text-faint); }
+
+  .shortcuts { display: flex; gap: 10px; margin-top: 24px; }
+  .chip {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 14px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  }
+  .chip svg { width: 18px; height: 18px; color: var(--gold); }
+  .chip span { font-size: 12px; color: var(--text-muted); }
+
+  .last-exchange { margin-top: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; }
+  .last-exchange-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+  .exchange-line { font-size: 13.5px; line-height: 1.5; margin-bottom: 4px; }
+  .exchange-line b { color: var(--gold); font-weight: 600; }
+  .exchange-line.assistant b { color: var(--blue); }
+  .exchange-line span { color: var(--text-muted); }
+
+  /* ---------- CHAT (Scrivi) ---------- */
+  .chat-scroll { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 10px 2px 12px; }
+  .bubble { max-width: 82%; padding: 11px 14px; border-radius: 16px; font-size: 14px; line-height: 1.5; }
+  .bubble.user { align-self: flex-end; background: var(--gold-dim); border: 1px solid rgba(242,183,5,0.25); border-bottom-right-radius: 4px; }
+  .bubble.assistant { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .bubble-label { display: block; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 4px; }
+
+  .chat-input-bar {
+    flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 22px;
+    padding: 6px 6px 6px 16px; margin-top: 8px;
+  }
+  .chat-input-bar input {
+    flex: 1; background: none; border: none; color: var(--text); font-family: var(--font-body); font-size: 14px; outline: none;
+  }
+  .chat-input-bar input::placeholder { color: var(--text-faint); }
+  .send-btn {
+    width: 36px; height: 36px; border-radius: 50%; background: var(--gold);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .send-btn svg { width: 16px; height: 16px; color: #1a1204; }
+
+  /* ---------- CRONOLOGIA ---------- */
+  .history-group-label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-faint); margin: 18px 2px 10px; }
+  .history-group-label:first-child { margin-top: 8px; }
+  .history-item { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 13px 15px; margin-bottom: 10px; }
+  .history-item-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .history-tag { font-family: var(--font-mono); font-size: 10px; color: var(--blue); background: rgba(47,182,246,0.12); padding: 3px 8px; border-radius: 20px; }
+  .history-time { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); }
+  .history-q { font-size: 13.5px; color: var(--text); margin-bottom: 3px; }
+  .history-a { font-size: 13px; color: var(--text-muted); }
+
+  /* ---------- IMPOSTAZIONI ---------- */
+  .settings-section-label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-faint); margin: 20px 2px 10px; }
+  .settings-section-label:first-child { margin-top: 8px; }
+  .settings-group { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+  .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 15px 16px; border-bottom: 1px solid var(--border); }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-row-label { font-size: 14px; }
+  .settings-row-value { font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+  .chevron { width: 14px; height: 14px; color: var(--text-faint); }
+
+  .toggle { width: 44px; height: 26px; border-radius: 20px; background: var(--surface-2); border: 1px solid var(--border); position: relative; flex-shrink: 0; }
+  .toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--text-faint); transition: transform 0.2s ease, background 0.2s ease; }
+  .toggle.on { background: rgba(242,183,5,0.18); border-color: var(--gold); }
+  .toggle.on::after { transform: translateX(18px); background: var(--gold); }
+
+  /* ---------- Foglio Meteo/IP ---------- */
+  .sheet-backdrop {
+    position: absolute; inset: 0; background: rgba(2,5,10,0.6); backdrop-filter: blur(2px);
+    opacity: 0; pointer-events: none; transition: opacity 0.25s ease; z-index: 10;
+  }
+  .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 11;
+    background: var(--surface); border: 1px solid var(--border); border-bottom: none;
+    border-radius: 24px 24px 0 0; padding: 10px 22px max(24px, env(safe-area-inset-bottom));
+    transform: translateY(100%); transition: transform 0.3s cubic-bezier(.32,.72,0,1);
+    max-width: 430px; margin: 0 auto;
+  }
+  .sheet.open { transform: translateY(0); }
+  .sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 3px; margin: 0 auto 18px; }
+  .sheet-icon { width: 46px; height: 46px; border-radius: 14px; background: var(--blue-dim); display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+  .sheet-icon svg { width: 22px; height: 22px; color: var(--blue); }
+  .sheet-title { font-family: var(--font-display); font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .sheet-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 18px; }
+  .sheet-stat-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .sheet-stat { flex: 1; background: var(--surface-2); border-radius: 14px; padding: 12px 14px; }
+  .sheet-stat-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .sheet-stat-value { font-family: var(--font-display); font-size: 20px; font-weight: 600; }
+  .sheet-note { font-size: 12px; color: var(--text-faint); line-height: 1.5; }
+
+  /* ---------- Barra di navigazione ---------- */
+  .tabbar {
+    flex-shrink: 0; display: flex; justify-content: space-around; align-items: center;
+    padding: 10px 10px max(12px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: rgba(14,24,38,0.9);
+  }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 14px; color: var(--text-faint); }
+  .tab svg { width: 21px; height: 21px; }
+  .tab span { font-size: 10.5px; font-family: var(--font-mono); letter-spacing: 0.02em; }
+  .tab.active { color: var(--gold); }
+</style>
+</head>
+<body>
+
+<div class="app" data-state="idle" data-view="home">
+
+  <div class="views">
+
+    <!-- ============ HOME ============ -->
+    <section class="view active" id="view-home">
+      <div class="topbar">
+        <div class="brand">
+          <div class="brand-mark">Jarvis</div>
+          <div class="brand-status">ATTIVO</div>
+        </div>
+      </div>
+
+      <div class="presence-wrap">
+        <div class="orb-stage">
+          <div class="hud-ring hud-ring--1"></div>
+          <div class="hud-ring hud-ring--2"></div>
+          <div class="hud-ring hud-ring--3"></div>
+          <div class="orb"></div>
+        </div>
+        <div class="status-label" id="statusLabel">in attesa</div>
+        <div class="greeting">Ciao Signore,<br>come posso aiutarla?</div>
+      </div>
+
+      <div class="mic-area">
+        <div class="mic-btn" id="micBtn" aria-label="Tieni premuto per parlare">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 18v4"/><path d="M9 22h6"/></svg>
+        </div>
+        <div class="mic-hint">tieni premuto per parlare</div>
+      </div>
+
+      <div class="shortcuts">
+        <button class="chip" data-sheet="meteo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17.5 19a4.5 4.5 0 1 0-1.44-8.76A6 6 0 0 0 5 12.5"/><path d="M8 13a5 5 0 1 0 0 6h9a3.5 3.5 0 0 0 0-7"/></svg>
+          <span>Meteo</span>
+        </button>
+        <button class="chip" data-sheet="ip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-5.33-7-11a7 7 0 0 1 14 0c0 5.67-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+          <span>Localizza IP</span>
+        </button>
+        <button class="chip" data-goto="chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          <span>Scrivi</span>
+        </button>
+      </div>
+
+      <div class="last-exchange" id="lastExchange" style="display:none;">
+        <div class="last-exchange-label">Ultimo scambio</div>
+        <div class="exchange-line"><b>Tu </b><span id="lastExchangeQ"></span></div>
+        <div class="exchange-line assistant"><b>Jarvis </b><span id="lastExchangeA"></span></div>
+      </div>
+    </section>
+
+    <!-- ============ SCRIVI (chat) ============ -->
+    <section class="view" id="view-chat">
+      <div class="topbar"><div class="view-title">Scrivi</div></div>
+      <div class="chat-scroll" id="chatScroll"></div>
+      <div class="chat-input-bar">
+        <input type="text" placeholder="Scrivi un messaggio…" id="chatInput">
+        <button class="send-btn" id="sendBtn" aria-label="Invia">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- ============ CRONOLOGIA ============ -->
+    <section class="view" id="view-history">
+      <div class="topbar"><div class="view-title">Cronologia</div></div>
+
+      <div id="historyEmpty" style="text-align:center; color:var(--text-faint); font-size:13px; margin-top:40px;">
+        Nessuna conversazione ancora.
+      </div>
+      <div id="historyList"></div>
+    </section>
+
+    <!-- ============ IMPOSTAZIONI ============ -->
+    <section class="view" id="view-settings">
+      <div class="topbar"><div class="view-title">Impostazioni</div></div>
+
+      <div class="settings-section-label">Connessione</div>
+      <div class="settings-group">
+        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+          <span class="settings-row-label">Chiave API Gemini</span>
+          <input type="password" id="apiKeyInput" placeholder="Incolla qui la tua chiave..."
+            style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; color:var(--text); font-size:13px; font-family:var(--font-mono); outline:none;">
+          <span style="font-size:11px; color:var(--text-faint); line-height:1.4;">Resta salvata solo su questo telefono. Ottienila gratis su aistudio.google.com/apikey</span>
+        </div>
+      </div>
+
+      <div class="settings-section-label">Assistente</div>
+      <div class="settings-group">
+        <div class="settings-row" id="rowNome" style="cursor:pointer;">
+          <span class="settings-row-label">Nome</span>
+          <span class="settings-row-value"><span id="valNome">Jarvis</span> <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span>
+        </div>
+        <div class="settings-row" id="rowAppellativo" style="cursor:pointer;">
+          <span class="settings-row-label">Modo di rivolgersi a te</span>
+          <span class="settings-row-value"><span id="valAppellativo">Signore</span> <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span>
+        </div>
+      </div>
+
+      <div class="settings-section-label">Voce e lingua</div>
+      <div class="settings-group">
+        <div class="settings-row" id="rowLingua" style="cursor:pointer;">
+          <span class="settings-row-label">Lingua</span>
+          <span class="settings-row-value"><span id="valLingua">Italiano</span> <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span>
+        </div>
+        <div class="settings-row">
+          <span class="settings-row-label">Cambio lingua automatico</span>
+          <div class="toggle on" data-toggle="autoLang"></div>
+        </div>
+        <div class="settings-row" id="rowVelocita" style="cursor:pointer;">
+          <span class="settings-row-label">Velocità voce</span>
+          <span class="settings-row-value"><span id="valVelocita">Normale</span> <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span>
+        </div>
+      </div>
+
+      <div class="settings-section-label">Microfono</div>
+      <div class="settings-group">
+        <div class="settings-row">
+          <span class="settings-row-label">Microfono attivo</span>
+          <div class="toggle on" data-toggle="micEnabled"></div>
+        </div>
+        <div class="settings-row">
+          <span class="settings-row-label">Leggi risposte ad alta voce</span>
+          <div class="toggle on" data-toggle="ttsEnabled"></div>
+        </div>
+      </div>
+
+      <div class="settings-section-label">Dati</div>
+      <div class="settings-group">
+        <div class="settings-row" id="clearHistoryBtn" style="cursor:pointer;">
+          <span class="settings-row-label">Cancella cronologia</span>
+          <span class="settings-row-value" style="color:var(--danger)">Cancella</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============ Foglio dettaglio Meteo/IP ============ -->
+  <div class="sheet-backdrop" id="sheetBackdrop"></div>
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-icon" id="sheetIcon"></div>
+    <div class="sheet-title" id="sheetTitle">Meteo — Milano</div>
+    <div class="sheet-subtitle" id="sheetSubtitle">Aggiornato ora</div>
+    <div class="sheet-stat-row" id="sheetStats"></div>
+    <div class="sheet-note" id="sheetNote"></div>
+  </div>
+
+  <!-- ============ Barra di navigazione ============ -->
+  <nav class="tabbar">
+    <button class="tab active" data-goto="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="tab" data-goto="chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>Scrivi</span>
+    </button>
+    <button class="tab" data-goto="history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      <span>Cronologia</span>
+    </button>
+    <button class="tab" data-goto="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Impostazioni</span>
+    </button>
+  </nav>
+
+</div>
+
+<script>
+  const app = document.querySelector('.app');
+  const views = document.querySelectorAll('.view');
+  const tabs = document.querySelectorAll('.tab');
+
+  function goto(name) {
+    views.forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.goto === name));
+    app.dataset.view = name;
+  }
+  document.querySelectorAll('[data-goto]').forEach(el =>
+    el.addEventListener('click', () => goto(el.dataset.goto))
+  );
+
+  /* =========================================================
+     IMPOSTAZIONI (salvate sul telefono con localStorage)
+     ========================================================= */
+  const DEFAULT_SETTINGS = {
+    apiKey: '',
+    nome: 'Jarvis',
+    appellativo: 'Signore',
+    lingua: 'Italiano',
+    autoLang: true,
+    micEnabled: true,
+    ttsEnabled: true,
+    voiceRate: 1
+  };
+  function loadSettings() {
+    try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem('jarvis_settings') || '{}') }; }
+    catch { return { ...DEFAULT_SETTINGS }; }
+  }
+  function saveSettings(s) { localStorage.setItem('jarvis_settings', JSON.stringify(s)); }
+  let settings = loadSettings();
+
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  apiKeyInput.value = settings.apiKey;
+  apiKeyInput.addEventListener('change', () => {
+    settings.apiKey = apiKeyInput.value.trim();
+    saveSettings(settings);
+  });
+
+  document.getElementById('valNome').textContent = settings.nome;
+  document.getElementById('valAppellativo').textContent = settings.appellativo;
+  document.getElementById('valLingua').textContent = settings.lingua;
+  document.getElementById('valVelocita').textContent =
+    settings.voiceRate < 1 ? 'Lenta' : settings.voiceRate > 1 ? 'Veloce' : 'Normale';
+  document.querySelector('.greeting').innerHTML = `Ciao ${settings.appellativo},<br>come posso aiutarla?`;
+
+  document.getElementById('rowNome').addEventListener('click', () => {
+    const v = prompt('Come vuoi che si chiami il tuo assistente?', settings.nome);
+    if (v && v.trim()) { settings.nome = v.trim(); saveSettings(settings); document.getElementById('valNome').textContent = settings.nome; }
+  });
+  document.getElementById('rowAppellativo').addEventListener('click', () => {
+    const v = prompt('Come vuoi che ti chiami?', settings.appellativo);
+    if (v && v.trim()) {
+      settings.appellativo = v.trim(); saveSettings(settings);
+      document.getElementById('valAppellativo').textContent = settings.appellativo;
+      document.querySelector('.greeting').innerHTML = `Ciao ${settings.appellativo},<br>come posso aiutarla?`;
+    }
+  });
+  document.getElementById('rowLingua').addEventListener('click', () => {
+    const v = prompt('Lingua principale (es. Italiano, English, Español)', settings.lingua);
+    if (v && v.trim()) { settings.lingua = v.trim(); saveSettings(settings); document.getElementById('valLingua').textContent = settings.lingua; }
+  });
+  document.getElementById('rowVelocita').addEventListener('click', () => {
+    const opts = ['Lenta', 'Normale', 'Veloce'];
+    const cur = opts[settings.voiceRate < 1 ? 0 : settings.voiceRate > 1 ? 2 : 1];
+    const v = prompt('Velocità voce: Lenta, Normale o Veloce', cur);
+    if (!v) return;
+    const key = v.trim().toLowerCase();
+    settings.voiceRate = key.startsWith('l') ? 0.8 : key.startsWith('v') ? 1.25 : 1;
+    saveSettings(settings);
+    document.getElementById('valVelocita').textContent = opts[settings.voiceRate < 1 ? 0 : settings.voiceRate > 1 ? 2 : 1];
+  });
+
+  document.querySelectorAll('[data-toggle]').forEach(t => {
+    const key = t.dataset.toggle;
+    t.classList.toggle('on', !!settings[key]);
+    t.addEventListener('click', () => {
+      settings[key] = !settings[key];
+      t.classList.toggle('on', settings[key]);
+      saveSettings(settings);
+    });
+  });
+
+  document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+    if (confirm('Cancellare tutta la cronologia e la chat?')) {
+      localStorage.removeItem('jarvis_history');
+      localStorage.removeItem('jarvis_chat');
+      renderHistory();
+      chatScroll.innerHTML = '';
+      document.getElementById('lastExchange').style.display = 'none';
+    }
+  });
+
+  /* =========================================================
+     CRONOLOGIA
+     ========================================================= */
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem('jarvis_history') || '[]'); }
+    catch { return []; }
+  }
+  function saveHistoryEntry(tag, q, a) {
+    const hist = loadHistory();
+    hist.unshift({ tag, q, a, time: new Date().toISOString() });
+    localStorage.setItem('jarvis_history', JSON.stringify(hist.slice(0, 200)));
+    renderHistory();
+  }
+  function renderHistory() {
+    const hist = loadHistory();
+    const list = document.getElementById('historyList');
+    const empty = document.getElementById('historyEmpty');
+    if (hist.length === 0) { empty.style.display = 'block'; list.innerHTML = ''; return; }
+    empty.style.display = 'none';
+    list.innerHTML = hist.map(h => {
+      const d = new Date(h.time);
+      const time = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      return `<div class="history-item">
+        <div class="history-item-top"><span class="history-tag">${h.tag}</span><span class="history-time">${time}</span></div>
+        <div class="history-q">${escapeHtml(h.q)}</div>
+        <div class="history-a">${escapeHtml(h.a)}</div>
+      </div>`;
+    }).join('');
+  }
+  function escapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  renderHistory();
+
+  function updateLastExchange(q, a) {
+    document.getElementById('lastExchange').style.display = 'block';
+    document.getElementById('lastExchangeQ').textContent = q;
+    document.getElementById('lastExchangeA').textContent = a;
+  }
+
+  /* =========================================================
+     CHAT — bolle + persistenza
+     ========================================================= */
+  const chatScroll = document.getElementById('chatScroll');
+  function loadChat() {
+    try { return JSON.parse(localStorage.getItem('jarvis_chat') || '[]'); }
+    catch { return []; }
+  }
+  function saveChat(chat) { localStorage.setItem('jarvis_chat', JSON.stringify(chat.slice(-200))); }
+  let chatHistory = loadChat(); // [{role:'user'|'model', text}]
+
+  function addBubble(role, text) {
+    const time = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    const div = document.createElement('div');
+    div.className = 'bubble ' + (role === 'user' ? 'user' : 'assistant');
+    div.innerHTML = `<span class="bubble-label">${role === 'user' ? 'Tu' : settings.nome} · ${time}</span>${escapeHtml(text)}`;
+    chatScroll.appendChild(div);
+    chatScroll.scrollTop = chatScroll.scrollHeight;
+  }
+  function renderChat() {
+    chatScroll.innerHTML = '';
+    if (chatHistory.length === 0) {
+      addBubble('model', `Ciao ${settings.appellativo}, sono pronto. Come posso aiutarla?`);
+    } else {
+      chatHistory.forEach(m => addBubble(m.role === 'user' ? 'user' : 'model', m.text));
+    }
+  }
+  renderChat();
+
+  /* =========================================================
+     GEMINI — chiamata reale all'API
+     ========================================================= */
+  async function askGemini(userText) {
+    if (!settings.apiKey) {
+      return 'Non ho ancora una chiave API, ' + settings.appellativo + '. Vai in Impostazioni e incollala nel campo "Chiave API Gemini" (gratuita su aistudio.google.com/apikey).';
+    }
+    const systemInstruction =
+      `Sei ${settings.nome}, un assistente personale intelligente. Rivolgiti all'utente chiamandolo "${settings.appellativo}". ` +
+      `Rispondi in modo naturale, utile e conciso, nella stessa lingua in cui ti scrive l'utente. ` +
+      (settings.autoLang ? 'Se l\'utente cambia lingua, cambia lingua anche tu.' : `Rispondi sempre in ${settings.lingua}.`);
+
+    const contents = chatHistory.slice(-16).map(m => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: m.text }]
+    }));
+    contents.push({ role: 'user', parts: [{ text: userText }] });
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(settings.apiKey)}`;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemInstruction }] },
+          contents
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data?.error?.message || 'errore sconosciuto';
+        return `C'è stato un problema con la chiave API o la richiesta (${msg}). Controlla la chiave in Impostazioni, ${settings.appellativo}.`;
+      }
+      const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || 'Non sono riuscito a generare una risposta.';
+      return text;
+    } catch (e) {
+      return 'Non riesco a raggiungere Gemini in questo momento. Controlla la connessione a internet.';
+    }
+  }
+
+  /* =========================================================
+     METEO — Open-Meteo (gratuito, nessuna chiave richiesta)
+     ========================================================= */
+  async function getWeather(city) {
+    try {
+      const geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=it`).then(r => r.json());
+      if (!geo.results || geo.results.length === 0) {
+        return { reply: `Non trovo una città chiamata "${city}", ${settings.appellativo}.`, data: null };
+      }
+      const g = geo.results[0];
+      const w = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${g.latitude}&longitude=${g.longitude}&current_weather=true`).then(r => r.json());
+      const cw = w.current_weather;
+      const reply = `A ${g.name}${g.country ? ', ' + g.country : ''}, al momento ci sono ${cw.temperature}°C, vento a ${cw.windspeed} km/h.`;
+      return {
+        reply,
+        data: {
+          title: `Meteo — ${g.name}`,
+          subtitle: 'Aggiornato ora',
+          stats: [['Temperatura', cw.temperature + '°C'], ['Vento', cw.windspeed + ' km/h']],
+          note: `Dati forniti da Open-Meteo per ${g.name}${g.country ? ', ' + g.country : ''}.`
+        }
+      };
+    } catch (e) {
+      return { reply: 'Non riesco a recuperare il meteo in questo momento.', data: null };
+    }
+  }
+
+  /* =========================================================
+     LOCALIZZAZIONE IP — ipapi.co (gratuito)
+     ========================================================= */
+  async function getIpInfo(ip) {
+    try {
+      const url = ip ? `https://ipapi.co/${encodeURIComponent(ip)}/json/` : `https://ipapi.co/json/`;
+      const d = await fetch(url).then(r => r.json());
+      if (d.error) return { reply: `Non riesco a localizzare quell'indirizzo IP, ${settings.appellativo}.`, data: null };
+      const reply = `L'indirizzo IP ${d.ip} risulta a ${d.city || 'una città sconosciuta'}, ${d.country_name || ''} — provider: ${d.org || 'sconosciuto'}.`;
+      return {
+        reply,
+        data: {
+          title: `Localizza IP — ${d.ip}`,
+          subtitle: 'Stima approssimativa',
+          stats: [['Città', d.city || '—'], ['Paese', d.country_name || '—']],
+          note: `Provider: ${d.org || 'sconosciuto'}. Stima a livello di città, non una posizione esatta.`
+        }
+      };
+    } catch (e) {
+      return { reply: 'Non riesco a recuperare i dati IP in questo momento.', data: null };
+    }
+  }
+
+  /* =========================================================
+     GESTIONE MESSAGGIO (testo o voce) — instrada verso meteo/IP/Gemini
+     ========================================================= */
+  let lastMeteoSheet = null, lastIpSheet = null;
+
+  async function handleUserMessage(text) {
+    chatHistory.push({ role: 'user', text });
+    addBubble('user', text);
+    saveChat(chatHistory);
+
+    const thinkingBubble = document.createElement('div');
+    thinkingBubble.className = 'bubble assistant';
+    thinkingBubble.innerHTML = `<span class="bubble-label">${settings.nome}</span>…`;
+    chatScroll.appendChild(thinkingBubble);
+    chatScroll.scrollTop = chatScroll.scrollHeight;
+
+    const lower = text.toLowerCase();
+    let reply, tag = 'Conversazione';
+
+    if (/meteo|che tempo fa|previsioni/.test(lower)) {
+      tag = 'Meteo';
+      const cityMatch = text.match(/(?:a|in)\s+([a-zA-ZàèéìòùÀÈÉÌÒÙ\s]+)$/i);
+      const city = cityMatch ? cityMatch[1].trim() : null;
+      if (!city) {
+        reply = `Di quale città vuole sapere il meteo, ${settings.appellativo}? Provi a scrivere "che tempo fa a Roma".`;
+      } else {
+        const w = await getWeather(city);
+        reply = w.reply;
+        if (w.data) { lastMeteoSheet = w.data; }
+      }
+    } else if (/indirizzo ip|localizza ip|il mio ip|rintraccia.*ip/.test(lower)) {
+      tag = 'IP';
+      const ipMatch = text.match(/\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/);
+      const r = await getIpInfo(ipMatch ? ipMatch[1] : null);
+      reply = r.reply;
+      if (r.data) { lastIpSheet = r.data; }
+    } else {
+      reply = await askGemini(text);
+    }
+
+    thinkingBubble.remove();
+    chatHistory.push({ role: 'model', text: reply });
+    saveChat(chatHistory);
+    addBubble('model', reply);
+    saveHistoryEntry(tag, text, reply);
+    updateLastExchange(text, reply);
+
+    if (settings.ttsEnabled) speak(reply);
+    return reply;
+  }
+
+  // --- Invio da tastiera ---
+  const chatInput = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('sendBtn');
+  function submitChatInput() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+    chatInput.value = '';
+    handleUserMessage(text);
+  }
+  sendBtn.addEventListener('click', submitChatInput);
+  chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitChatInput(); });
+
+  /* =========================================================
+     VOCE — riconoscimento (Web Speech API) e sintesi vocale
+     ========================================================= */
+  const micBtn = document.getElementById('micBtn');
+  const statusLabel = document.getElementById('statusLabel');
+  function setListening(on) {
+    app.dataset.state = on ? 'listening' : 'idle';
+    statusLabel.textContent = on ? 'in ascolto…' : 'in attesa';
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognizer = null;
+  if (SpeechRecognition) {
+    recognizer = new SpeechRecognition();
+    recognizer.continuous = false;
+    recognizer.interimResults = false;
+    recognizer.onresult = (e) => {
+      const said = e.results[0][0].transcript;
+      handleUserMessage(said);
+    };
+    recognizer.onend = () => setListening(false);
+    recognizer.onerror = () => { setListening(false); statusLabel.textContent = 'non ho capito, riprova'; };
+  }
+
+  function startListening() {
+    if (!settings.micEnabled) { statusLabel.textContent = 'microfono disattivato nelle impostazioni'; return; }
+    if (!recognizer) { statusLabel.textContent = 'riconoscimento vocale non supportato qui'; return; }
+    try {
+      recognizer.lang = settings.autoLang ? undefined : localeFromLanguageName(settings.lingua);
+      recognizer.start();
+      setListening(true);
+    } catch (e) { /* già in ascolto */ }
+  }
+  function stopListening() {
+    if (recognizer) { try { recognizer.stop(); } catch (e) {} }
+    setListening(false);
+  }
+  if (micBtn) {
+    micBtn.addEventListener('mousedown', startListening);
+    micBtn.addEventListener('touchstart', e => { e.preventDefault(); startListening(); }, { passive: false });
+    ['mouseup', 'mouseleave', 'touchend'].forEach(evt => micBtn.addEventListener(evt, stopListening));
+  }
+
+  function localeFromLanguageName(name) {
+    const map = { italiano: 'it-IT', english: 'en-US', español: 'es-ES', francais: 'fr-FR', français: 'fr-FR', deutsch: 'de-DE' };
+    return map[(name || '').trim().toLowerCase()] || 'it-IT';
+  }
+
+  function speak(text) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = localeFromLanguageName(settings.lingua);
+    u.rate = settings.voiceRate || 1;
+    window.speechSynthesis.speak(u);
+  }
+
+  /* =========================================================
+     FOGLIO Meteo/IP — ora con dati reali
+     ========================================================= */
+  const sheet = document.getElementById('sheet');
+  const backdrop = document.getElementById('sheetBackdrop');
+  const sheetIcon = document.getElementById('sheetIcon');
+  const sheetTitle = document.getElementById('sheetTitle');
+  const sheetSubtitle = document.getElementById('sheetSubtitle');
+  const sheetStats = document.getElementById('sheetStats');
+  const sheetNote = document.getElementById('sheetNote');
+
+  const ICONS = {
+    meteo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17.5 19a4.5 4.5 0 1 0-1.44-8.76A6 6 0 0 0 5 12.5"/><path d="M8 13a5 5 0 1 0 0 6h9a3.5 3.5 0 0 0 0-7"/></svg>',
+    ip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-5.33-7-11a7 7 0 0 1 14 0c0 5.67-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>'
+  };
+
+  function openSheetWithData(kind, data) {
+    sheetIcon.innerHTML = ICONS[kind];
+    sheetTitle.textContent = data.title;
+    sheetSubtitle.textContent = data.subtitle;
+    sheetStats.innerHTML = data.stats.map(([label, value]) =>
+      `<div class="sheet-stat"><div class="sheet-stat-label">${label}</div><div class="sheet-stat-value">${escapeHtml(String(value))}</div></div>`
+    ).join('');
+    sheetNote.textContent = data.note;
+    sheet.classList.add('open');
+    backdrop.classList.add('open');
+  }
+  function closeSheet() {
+    sheet.classList.remove('open');
+    backdrop.classList.remove('open');
+  }
+  backdrop.addEventListener('click', closeSheet);
+
+  document.querySelector('[data-sheet="meteo"]').addEventListener('click', async () => {
+    const city = prompt('Di quale città vuoi il meteo?', 'Milano');
+    if (!city) return;
+    sheetIcon.innerHTML = ICONS.meteo;
+    sheetTitle.textContent = 'Sto cercando...';
+    sheetSubtitle.textContent = '';
+    sheetStats.innerHTML = '';
+    sheetNote.textContent = '';
+    sheet.classList.add('open');
+    backdrop.classList.add('open');
+    const w = await getWeather(city);
+    if (w.data) {
+      openSheetWithData('meteo', w.data);
+      saveHistoryEntry('Meteo', `Meteo a ${city}`, w.reply);
+    } else {
+      sheetTitle.textContent = 'Errore';
+      sheetNote.textContent = w.reply;
+    }
+  });
+
+  document.querySelector('[data-sheet="ip"]').addEventListener('click', async () => {
+    sheetIcon.innerHTML = ICONS.ip;
+    sheetTitle.textContent = 'Sto cercando...';
+    sheetSubtitle.textContent = '';
+    sheetStats.innerHTML = '';
+    sheetNote.textContent = '';
+    sheet.classList.add('open');
+    backdrop.classList.add('open');
+    const r = await getIpInfo(null);
+    if (r.data) {
+      openSheetWithData('ip', r.data);
+      saveHistoryEntry('IP', 'Localizza il mio indirizzo IP', r.reply);
+    } else {
+      sheetTitle.textContent = 'Errore';
+      sheetNote.textContent = r.reply;
+    }
+  });
+
+  // --- Registrazione service worker (rende l'app installabile e offline) ---
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    });
+  }
+</script>
+
+</body>
+</html>
