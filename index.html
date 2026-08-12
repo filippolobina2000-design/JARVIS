@@ -3,22 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>JARVIS AI - Operational Core</title>
+  <title>JARVIS AI System</title>
   <meta name="theme-color" content="#08090d">
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <style>
     :root {
-      --bg-color: #08090d;
-      --card-bg: rgba(15, 20, 31, 0.85);
+      --bg-color: #040810;
+      --card-bg: rgba(10, 20, 32, 0.85);
       --accent-color: #00f3ff;
       --accent-glow: rgba(0, 243, 255, 0.4);
       --text-main: #e0f7fc;
-      --text-muted: #64748b;
+      --text-muted: #4a6b82;
       --danger: #ff0055;
       --border-color: rgba(0, 243, 255, 0.3);
     }
@@ -44,22 +44,24 @@
 
     .app-container {
       width: 100%;
-      max-width: 480px;
+      max-width: 500px;
       height: 100vh;
       display: flex;
       flex-direction: column;
       position: relative;
-      background: radial-gradient(circle at center, #0f172a 0%, var(--bg-color) 100%);
+      background: radial-gradient(circle at center, #0a1626 0%, var(--bg-color) 100%);
       border: 1px solid var(--border-color);
+      box-shadow: 0 0 30px rgba(0, 243, 255, 0.1);
     }
 
+    /* HEADER HUD */
     header {
-      padding: 12px 16px;
+      padding: 14px 18px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid var(--border-color);
-      background: rgba(8, 9, 13, 0.9);
+      background: rgba(4, 8, 16, 0.95);
       backdrop-filter: blur(10px);
       z-index: 10;
     }
@@ -67,22 +69,49 @@
     .logo {
       font-family: 'Orbitron', sans-serif;
       font-weight: 900;
-      font-size: 1.1rem;
+      font-size: 1.2rem;
       letter-spacing: 2px;
       color: var(--accent-color);
       text-shadow: 0 0 10px var(--accent-glow);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .icon-badge {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-color);
+      font-size: 0.75rem;
+      background: rgba(0, 243, 255, 0.05);
+    }
+
+    .icon-badge.alert {
+      border-color: var(--danger);
+      color: var(--danger);
     }
 
     .sys-badge {
-      font-size: 0.7rem;
-      padding: 3px 8px;
-      border-radius: 10px;
-      background: rgba(0, 0, 0, 0.5);
+      font-size: 0.65rem;
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: rgba(0, 243, 255, 0.1);
       border: 1px solid var(--border-color);
       color: var(--accent-color);
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       font-family: 'Orbitron', sans-serif;
     }
 
@@ -94,6 +123,7 @@
       box-shadow: 0 0 8px var(--accent-color);
     }
 
+    /* VISTE */
     .view-content {
       flex: 1;
       position: relative;
@@ -107,49 +137,11 @@
       flex-direction: column;
     }
 
-    #home-view {
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      gap: 20px;
-    }
-
-    .orb-visualizer {
-      width: 180px;
-      height: 180px;
-      border-radius: 50%;
-      border: 2px dashed var(--accent-color);
-      box-shadow: 0 0 20px var(--accent-glow);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      animation: spin 12s linear infinite;
-      cursor: pointer;
-    }
-
-    .orb-inner {
-      width: 120px;
-      height: 120px;
-      border-radius: 50%;
-      background: radial-gradient(circle, var(--accent-color) 0%, transparent 70%);
-      opacity: 0.8;
-      animation: pulse 2s ease-in-out infinite alternate;
-    }
-
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-    @keyframes pulse { 0% { transform: scale(0.85); opacity: 0.5; } 100% { transform: scale(1.1); opacity: 0.9; } }
-
-    .voice-status {
-      font-family: 'Orbitron', sans-serif;
-      font-size: 0.85rem;
-      color: var(--accent-color);
-      letter-spacing: 1px;
-      min-height: 24px;
-    }
-
+    /* CHAT VIEW */
     #chat-view {
-      padding: 10px;
-      gap: 10px;
+      padding: 12px;
+      gap: 12px;
+      overflow: hidden;
     }
 
     .chat-messages {
@@ -157,106 +149,187 @@
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      padding-bottom: 5px;
+      gap: 12px;
+      padding-right: 5px;
+    }
+
+    /* Scrollbar personalizzata come da screenshot */
+    .chat-messages::-webkit-scrollbar {
+      width: 6px;
+    }
+    .chat-messages::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .chat-messages::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 3px;
     }
 
     .message {
-      max-width: 88%;
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-size: 0.9rem;
-      line-height: 1.45;
+      max-width: 82%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      line-height: 1.4;
       word-break: break-word;
+      position: relative;
     }
 
     .message.user {
       align-self: flex-end;
-      background: rgba(0, 243, 255, 0.15);
+      background: rgba(0, 243, 255, 0.12);
       border: 1px solid var(--border-color);
       border-bottom-right-radius: 2px;
+      color: #ffffff;
     }
 
     .message.assistant {
       align-self: flex-start;
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
+      background: rgba(10, 24, 40, 0.9);
+      border: 1px solid rgba(0, 243, 255, 0.25);
       border-bottom-left-radius: 2px;
+      color: var(--text-main);
+    }
+
+    .copy-btn {
+      position: absolute;
+      bottom: -18px;
+      left: 0;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 3px;
     }
 
     .input-container {
-      padding: 8px 12px;
-      background: rgba(8, 9, 13, 0.95);
-      border-top: 1px solid var(--border-color);
+      padding: 10px;
+      background: rgba(4, 8, 16, 0.95);
+      border: 1px solid var(--border-color);
+      border-radius: 25px;
       display: flex;
-      gap: 6px;
+      gap: 8px;
       align-items: center;
+      margin-top: 5px;
     }
 
     .input-container input[type="text"] {
       flex: 1;
-      background: rgba(15, 20, 31, 0.9);
-      border: 1px solid var(--border-color);
-      border-radius: 18px;
-      padding: 8px 14px;
+      background: transparent;
+      border: none;
+      padding: 6px 10px;
       color: var(--text-main);
       font-family: inherit;
       outline: none;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
     }
 
-    .btn-icon {
-      width: 38px;
-      height: 38px;
+    .input-container input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .btn-action {
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
       border: 1px solid var(--border-color);
-      background: rgba(15, 20, 31, 0.9);
+      background: rgba(0, 243, 255, 0.05);
       color: var(--accent-color);
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       font-size: 0.9rem;
+      transition: all 0.2s ease;
     }
 
-    .btn-icon.recording {
+    .btn-action:active {
+      transform: scale(0.95);
+      background: rgba(0, 243, 255, 0.2);
+    }
+
+    .btn-action.recording {
       background: var(--danger);
       color: white;
       border-color: var(--danger);
+      box-shadow: 0 0 10px var(--danger);
     }
 
-    .settings-group {
+    /* HUD & UTILITY VIEWS */
+    #hud-view, #utility-view {
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .hud-orb {
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      border: 2px dashed var(--accent-color);
+      box-shadow: 0 0 25px var(--accent-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: spin 15s linear infinite;
+      margin-bottom: 20px;
+    }
+
+    .hud-orb-inner {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--accent-color) 0%, transparent 70%);
+      opacity: 0.8;
+    }
+
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    /* CONFIG VIEW */
+    .config-box {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 15px;
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
     }
 
-    .setting-item {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+    .config-box label {
+      font-size: 0.85rem;
+      color: var(--accent-color);
+      font-family: 'Orbitron', sans-serif;
     }
 
-    .setting-item label {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-
-    .setting-item input {
-      background: rgba(15, 20, 31, 0.9);
+    .config-box input {
+      background: rgba(4, 8, 16, 0.8);
       border: 1px solid var(--border-color);
       border-radius: 6px;
-      padding: 8px;
+      padding: 10px;
       color: var(--text-main);
-      font-family: inherit;
-      font-size: 0.85rem;
+      outline: none;
     }
 
+    .save-btn {
+      background: rgba(0, 243, 255, 0.15);
+      border: 1px solid var(--accent-color);
+      color: var(--accent-color);
+      padding: 10px;
+      border-radius: 6px;
+      font-family: 'Orbitron', sans-serif;
+      cursor: pointer;
+    }
+
+    /* BARRA DI NAVIGAZIONE IN BASSO */
     nav {
       display: flex;
       justify-content: space-around;
-      padding: 8px 0;
-      background: rgba(8, 9, 13, 0.95);
+      padding: 10px 0;
+      background: rgba(4, 8, 16, 0.98);
       border-top: 1px solid var(--border-color);
     }
 
@@ -268,12 +341,13 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 3px;
-      font-size: 0.65rem;
+      gap: 4px;
+      font-size: 0.7rem;
       font-family: 'Orbitron', sans-serif;
+      transition: color 0.2s ease;
     }
 
-    .nav-btn i { font-size: 1.1rem; }
+    .nav-btn i { font-size: 1.2rem; }
 
     .nav-btn.active {
       color: var(--accent-color);
@@ -284,54 +358,76 @@
 <body>
 
   <div class="app-container">
+    <!-- Header -->
     <header>
-      <div class="logo"><i class="fa-solid fa-microchip"></i> JARVIS</div>
-      <div class="sys-badge">
-        <div class="status-dot"></div>
-        <span>OPERATIVO</span>
+      <div class="logo">
+        <i class="fa-solid fa-microchip"></i> JARVIS
+      </div>
+      <div class="header-actions">
+        <div class="icon-badge alert"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="icon-badge"><i class="fa-solid fa-cloud-sun"></i></div>
+        <div class="sys-badge">
+          <div class="status-dot"></div>
+          <span>ONLINE</span>
+        </div>
       </div>
     </header>
 
-    <!-- Home View -->
-    <main id="home-view" class="view-content active">
-      <div class="orb-visualizer" id="orb-trigger">
-        <div class="orb-inner"></div>
+    <!-- HUD View -->
+    <main id="hud-view" class="view-content">
+      <div class="hud-orb">
+        <div class="hud-orb-inner"></div>
       </div>
-      <div class="voice-status" id="voice-status">Tocca l'orbe o il mic per parlare</div>
-      <button class="btn-icon" id="quick-mic-btn" style="width:55px; height:55px; font-size:1.3rem;">
-        <i class="fa-solid fa-microphone"></i>
-      </button>
+      <h3 style="font-family:'Orbitron'; color:var(--accent-color);">SISTEMA PRONTO</h3>
+      <p style="color:var(--text-muted); font-size:0.9rem; margin-top:5px;">Spostati nel tab CHAT per interagire con Jarvis.</p>
     </main>
 
-    <!-- Chat View -->
-    <main id="chat-view" class="view-content">
-      <div class="chat-messages" id="chat-messages"></div>
-      <div class="input-container">
-        <input type="text" id="chat-input" placeholder="Chiedi qualcosa a Jarvis..." autocomplete="off">
-        <button class="btn-icon" id="mic-btn"><i class="fa-solid fa-microphone"></i></button>
-        <button class="btn-icon" id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+    <!-- Chat View (Attivo di default) -->
+    <main id="chat-view" class="view-content active">
+      <div class="chat-messages" id="chat-messages">
+        <!-- Messaggio iniziale -->
+        <div class="message assistant">
+          Sistemi online. Come posso assisterti, Signore?
+        </div>
       </div>
+
+      <!-- Barra Input come nello Screenshot -->
+      <div class="input-container">
+        <button class="btn-action" id="attach-btn"><i class="fa-solid fa-paperclip"></i></button>
+        <input type="text" id="chat-input" placeholder="Comando o domanda per Jarvis..." autocomplete="off">
+        <button class="btn-action" id="mic-btn"><i class="fa-solid fa-microphone"></i></button>
+        <button class="btn-action" id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+      </div>
+    </main>
+
+    <!-- Utility View -->
+    <main id="utility-view" class="view-content">
+      <h3 style="font-family:'Orbitron'; color:var(--accent-color); margin-bottom:10px;">UTILITY MODES</h3>
+      <p style="color:var(--text-muted);">Strumenti diagnostici e moduli aggiuntivi attivi.</p>
     </main>
 
     <!-- Config View -->
     <main id="settings-view" class="view-content">
-      <div class="settings-group">
-        <div class="setting-item">
-          <label for="api-key">Chiave API Google Gemini</label>
-          <input type="password" id="api-key" placeholder="Incolla chiave AIzaSy...">
-        </div>
-        <button id="save-settings" class="btn-icon" style="width: 100%; border-radius: 8px; font-family:'Orbitron'; font-size: 0.8rem; margin-top: 10px;">SALVA CONFIGURAZIONE</button>
+      <div class="config-box">
+        <label for="api-key">CHIAVE API GOOGLE GEMINI</label>
+        <input type="password" id="api-key" placeholder="Incolla chiave AIzaSy...">
+        <button class="save-btn" id="save-settings">SALVA CONFIGURAZIONE</button>
       </div>
     </main>
 
+    <!-- Navigazione In Basso -->
     <nav>
-      <button class="nav-btn active" data-target="home-view">
-        <i class="fa-solid fa-atom"></i>
+      <button class="nav-btn" data-target="hud-view">
+        <i class="fa-solid fa-gear"></i>
         <span>HUD</span>
       </button>
-      <button class="nav-btn" data-target="chat-view">
-        <i class="fa-solid fa-message"></i>
+      <button class="nav-btn active" data-target="chat-view">
+        <i class="fa-solid fa-comment-dots"></i>
         <span>CHAT</span>
+      </button>
+      <button class="nav-btn" data-target="utility-view">
+        <i class="fa-solid fa-cubes"></i>
+        <span>UTILITY</span>
       </button>
       <button class="nav-btn" data-target="settings-view">
         <i class="fa-solid fa-sliders"></i>
@@ -346,7 +442,7 @@
       isListening: false
     };
 
-    // Navigazione Menu
+    // Navigazione Tab
     document.querySelectorAll('.nav-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -356,43 +452,36 @@
       });
     });
 
-    // Chiamata API Reale a Gemini
+    // Chiamata Gemini diretta ed esente da blocchi
     async function fetchGeminiResponse(promptText) {
       if (!state.apiKey) {
-        alert("Inserisci la chiave API nelle impostazioni (CONFIG)!");
-        document.querySelector('[data-target="settings-view"]').click();
-        return "⚠️ Errore: Inserisci la chiave API nella sezione CONFIG per attivare JARVIS.";
+        return "⚠️ Inserisci la tua API Key nella sezione CONFIG prima di continuare.";
       }
 
-      // Utilizza l'endpoint REST nativo
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.apiKey}`;
-      
-      const payload = {
-        contents: [{
-          parts: [{ text: "Sei JARVIS, un assistente IA conciso e brillante. Rispondi brevemente in italiano: " + promptText }]
-        }]
-      };
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.apiKey}`;
 
       try {
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: "Sei JARVIS, un assistente virtuale evoluto, conciso e formale. Rispondi in italiano: " + promptText }] }]
+          })
         });
 
         const data = await response.json();
-        
+
         if (data.error) {
           return `⚠️ Errore Google API: ${data.error.message}`;
         }
 
         return data.candidates[0].content.parts[0].text;
       } catch (err) {
-        return "⚠️ Impossibile connettersi ai server Gemini. Verifica la connessione o l'API Key.";
+        return "⚠️ Errore di connessione ai server di Google Gemini.";
       }
     }
 
-    // Interfaccia Chat
+    // Gestione Chat
     const chatMessagesContainer = document.getElementById('chat-messages');
     const chatInput = document.getElementById('chat-input');
 
@@ -400,6 +489,19 @@
       const msgDiv = document.createElement('div');
       msgDiv.className = `message ${sender}`;
       msgDiv.innerText = text;
+      
+      if (sender === 'assistant') {
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i>';
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(text);
+          copyBtn.innerHTML = '<i class="fa-solid fa-check"></i>';
+          setTimeout(() => copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i>', 1500);
+        };
+        msgDiv.appendChild(copyBtn);
+      }
+
       chatMessagesContainer.appendChild(msgDiv);
       chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
       return msgDiv;
@@ -412,12 +514,12 @@
       appendMessage('user', text);
       chatInput.value = '';
 
-      document.getElementById('voice-status').innerText = 'Elaborazione...';
-      const loadingMsg = appendMessage('assistant', 'Pensando...');
+      // Mostra inizialmente i tre pallini "..."
+      const loadingMsg = appendMessage('assistant', '...');
 
+      // Sostituisce i tre pallini con la risposta reale
       const reply = await fetchGeminiResponse(text);
-      loadingMsg.innerText = reply;
-      document.getElementById('voice-status').innerText = 'In attesa del comando...';
+      loadingMsg.childNodes[0].nodeValue = reply;
 
       speakText(reply);
     }
@@ -425,7 +527,7 @@
     document.getElementById('send-btn').addEventListener('click', () => handleUserSend());
     chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleUserSend(); });
 
-    // Speech Recognition (Riconoscimento Vocale Native)
+    // Speech Recognition
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
@@ -434,8 +536,6 @@
       recognition.onstart = () => {
         state.isListening = true;
         document.getElementById('mic-btn').classList.add('recording');
-        document.getElementById('quick-mic-btn').classList.add('recording');
-        document.getElementById('voice-status').innerText = 'Ti ascolto...';
       };
 
       recognition.onresult = (event) => {
@@ -447,23 +547,18 @@
       recognition.onend = () => {
         state.isListening = false;
         document.getElementById('mic-btn').classList.remove('recording');
-        document.getElementById('quick-mic-btn').classList.remove('recording');
       };
 
-      const toggleMic = () => {
+      document.getElementById('mic-btn').addEventListener('click', () => {
         if (!state.isListening) recognition.start();
-      };
-
-      document.getElementById('mic-btn').addEventListener('click', toggleMic);
-      document.getElementById('quick-mic-btn').addEventListener('click', toggleMic);
-      document.getElementById('orb-trigger').addEventListener('click', toggleMic);
+      });
     }
 
-    // Speech Synthesis (Sintesi Vocale Native)
+    // Speech Synthesis
     function speakText(text) {
       if (!('speechSynthesis' in window)) return;
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new SpeechSynthesisUtterance(text.replace(/⚠️/g, ''));
       utterance.lang = 'it-IT';
       window.speechSynthesis.speak(utterance);
     }
@@ -472,14 +567,15 @@
     document.getElementById('save-settings').addEventListener('click', () => {
       state.apiKey = document.getElementById('api-key').value.trim();
       localStorage.setItem('jarvis_api_key', state.apiKey);
-      alert('Chiave salvata! Ora JARVIS è pronto ad abbinarsi alle tue richieste.');
-      document.querySelector('[data-target="home-view"]').click();
+      alert('Chiave salvata correttamente!');
+      document.querySelector('[data-target="chat-view"]').click();
     });
 
     document.getElementById('api-key').value = state.apiKey;
   </script>
 </body>
 </html>
+
 
 
 
