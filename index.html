@@ -1,242 +1,1220 @@
-import React, { useEffect, useState } from "react";
-import { appParams } from "@/lib/app-params";
-import { Button } from "@/components/ui/button";
-import { ShieldCheck, Loader2 } from "lucide-react";
-import AuthLayout from "@/components/AuthLayout";
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>JARVIS AI - Ultimate Engine</title>
+  <meta name="theme-color" content="#08090d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-// App-side OAuth consent page for the app's MCP server. The platform redirects
-// AI clients here (see base44/mcp/config.json `consent_path`) with an opaque
-// `ctx` handle — the authorization request itself lives on the server. This page
-// gates on the app-user session, fetches the display info for that handle, shows
-// the categories of access being granted, and posts the approve/deny decision.
-// Do not change the fetch calls, headers, or the `ctx` handle handling — styling
-// and copy are safe to edit.
-export default function OAuthConsent() {
-  const ctx = new URLSearchParams(window.location.search).get("ctx");
-  const [info, setInfo] = useState(null);
-  const [checking, setChecking] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [decided, setDecided] = useState("");
-  const [error, setError] = useState("");
-  const [reconnect, setReconnect] = useState("");
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
 
-  useEffect(() => {
-    (async () => {
-      let redirecting = false;
-      try {
-        if (!ctx) {
-          setError("This authorization link is invalid or has expired.");
-          return;
-        }
-        // Resolve the handle first: a dead handle must never render
-        // approve/deny, and the response carries the app's configured login
-        // route for the signed-out redirect below. Send the session (cookie +
-        // bearer token) so the server can list the granted tools for a
-        // signed-in user — the same auth the approve/deny call sends; without
-        // it the display request is anonymous and shows no tools.
-        const infoHeaders = {};
-        if (appParams.token) infoHeaders.Authorization = "Bearer " + appParams.token;
-        const res = await fetch(
-          `/api/apps/${appParams.appId}/mcp/consent-info?handle=${encodeURIComponent(ctx)}`,
-          { credentials: "include", headers: infoHeaders },
-        );
-        if (!res.ok) {
-          setError("This authorization link is invalid or has expired.");
-          return;
-        }
-        const data = await res.json();
-        // Gate on the server's auth result, NOT base44.auth.isAuthenticated():
-        // the SDK check runs the bearer path, so a cookie-only session (platform
-        // login/SSO, or a private app with a stale localStorage token) would read
-        // as signed-out and redirect — even though /consent-info just
-        // authenticated this same request via its cookie fallback. data.authenticated
-        // keeps the redirect decision in agreement with what the server returned.
-        if (!data.authenticated) {
-          // The short handle rides back in returnTo; login_path is
-          // owner-configured and validated server-side as a same-origin path.
-          // Send from_url too: a custom-auth app coerced to platform auth (e.g.
-          // public_without_login under workspace SSO) serves the platform login,
-          // which honors from_url rather than returnTo. Rebuild the query from
-          // `ctx` alone — never forward window.location.search raw: the platform
-          // resume returns from_url verbatim, so crafted extras on the consent
-          // link (app_base_url, access_token, …) would ride through the login
-          // round-trip and app-params.js would persist them into the freshly
-          // authenticated session.
-          const returnTo =
-            window.location.pathname + "?ctx=" + encodeURIComponent(ctx);
-          const encoded = encodeURIComponent(returnTo);
-          redirecting = true; // keep the spinner while the browser navigates
-          window.location.href =
-            (data.login_path || "/login") + "?returnTo=" + encoded + "&from_url=" + encoded;
-          return;
-        }
-        setInfo(data);
-      } catch (e) {
-        setError("Could not load this authorization request. Please try again.");
-      } finally {
-        if (!redirecting) setChecking(false);
-      }
-    })();
-  }, [ctx]);
-
-  const respond = async (action) => {
-    setSubmitting(true);
-    setError("");
-    try {
-      const headers = { "Content-Type": "application/json" };
-      // Cookie-backed sessions carry no token; sending "Bearer null" would
-      // shadow the valid cookie, so add the header only when a token exists.
-      if (appParams.token) headers.Authorization = "Bearer " + appParams.token;
-      const res = await fetch(`/api/apps/${appParams.appId}/mcp/authorize-grant`, {
-        method: "POST",
-        credentials: "include",
-        headers,
-        body: JSON.stringify({ ctx, action }),
-      });
-      if (!res.ok) {
-        // 401 = the session expired before the (single-use, still-unconsumed)
-        // handle was spent; retrying the same controls re-sends the dead session
-        // forever. Send the user back through login preserving `ctx` — the same
-        // redirect the initial signed-out path uses — so they can return and
-        // approve the still-valid handle.
-        if (res.status === 401) {
-          const returnTo = window.location.pathname + "?ctx=" + encodeURIComponent(ctx);
-          const encoded = encodeURIComponent(returnTo);
-          window.location.href =
-            ((info && info.login_path) || "/login") + "?returnTo=" + encoded + "&from_url=" + encoded;
-          return;
-        }
-        // These all come AFTER the single-use handle is atomically consumed
-        // (409 tool set changed; 403 host/resource/app mismatch; 404 access
-        // gone; 400 malformed/handle already used), so retrying can only 404.
-        // Show a terminal reconnect state, not an impossible "try again".
-        if ([400, 403, 404, 409].includes(res.status)) {
-          let detail = "";
-          try { detail = (await res.json()).detail; } catch (_) { /* keep default */ }
-          setReconnect(detail || "This authorization can no longer be completed. Reconnect from your AI client to try again.");
-          setSubmitting(false);
-          return;
-        }
-        throw new Error("Could not complete authorization. Please try again.");
-      }
-      const data = await res.json();
-      window.location.href = data.redirect_url;
-      if (!/^https?:/i.test(data.redirect_url)) {
-        // Custom-scheme redirect (native AI clients, e.g. cursor://): browsers
-        // may block or not visibly navigate, so show a terminal state instead
-        // of an eternal spinner.
-        setDecided(action);
-        setSubmitting(false);
-      }
-    } catch (e) {
-      setError(e.message);
-      setSubmitting(false);
+  <style>
+    :root {
+      --bg-color: #08090d;
+      --card-bg: rgba(15, 20, 31, 0.75);
+      --accent-color: #00f3ff;
+      --accent-glow: rgba(0, 243, 255, 0.4);
+      --text-main: #e0f7fc;
+      --text-muted: #64748b;
+      --danger: #ff0055;
+      --success: #00ff88;
+      --warning: #ffb700;
+      --border-color: rgba(0, 243, 255, 0.25);
     }
-  };
 
-  if (checking) {
-    return (
-      <AuthLayout icon={ShieldCheck} title="Authorize access">
-        <div className="flex items-center justify-center py-6 text-muted-foreground">
-          <Loader2 className="w-5 h-5 mr-2 animate-spin" aria-hidden="true" />
-          Loading…
-        </div>
-      </AuthLayout>
-    );
-  }
+    body.theme-red {
+      --accent-color: #ff0055;
+      --accent-glow: rgba(255, 0, 85, 0.4);
+      --text-main: #ffe6ec;
+      --border-color: rgba(255, 0, 85, 0.35);
+    }
 
-  const client = (info && info.client_name) || "An AI client";
-  const appName = (info && info.app_name) || "this app";
+    body.theme-green {
+      --accent-color: #00ff88;
+      --accent-glow: rgba(0, 255, 136, 0.4);
+      --text-main: #e6fff2;
+      --border-color: rgba(0, 255, 136, 0.35);
+    }
 
-  if (decided) {
-    return (
-      <AuthLayout
-        icon={ShieldCheck}
-        title={decided === "approve" ? "Access granted" : "Access denied"}
-        subtitle={`You can return to ${client} and close this window.`}
-      />
-    );
-  }
+    body.theme-matrix {
+      --bg-color: #020d04;
+      --card-bg: rgba(4, 26, 10, 0.85);
+      --accent-color: #00ff41;
+      --accent-glow: rgba(0, 255, 65, 0.5);
+      --text-main: #00ff41;
+      --border-color: rgba(0, 255, 65, 0.4);
+    }
 
-  // Terminal: the authorization request is no longer valid (tool set changed +
-  // handle consumed). Retrying can't succeed, so show reconnect guidance with
-  // no approve/deny controls.
-  if (reconnect) {
-    return (
-      <AuthLayout icon={ShieldCheck} title="Reconnect required">
-        <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {reconnect}
-        </div>
-      </AuthLayout>
-    );
-  }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
 
-  // No consent details means nothing trustworthy to approve: a failed
-  // consent-info load (expired handle, rate limit, transient error) renders
-  // the error alone, never the approve/deny controls.
-  if (error && !info) {
-    return (
-      <AuthLayout icon={ShieldCheck} title="Authorize access">
-        <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {error}
-        </div>
-      </AuthLayout>
-    );
-  }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: 'Rajdhani', sans-serif;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
 
-  const tools = Array.isArray(info.tools) ? info.tools : [];
+    .app-container {
+      width: 100%;
+      max-width: 480px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: radial-gradient(circle at center, #0f172a 0%, var(--bg-color) 100%);
+      border: 1px solid var(--border-color);
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+    }
 
-  return (
-    <AuthLayout
-      icon={ShieldCheck}
-      title="Authorize access"
-      subtitle={`${client} wants to access ${appName} on your behalf`}
-    >
-      {error && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {error}
-        </div>
-      )}
+    header {
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(8, 9, 13, 0.85);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
 
-      <p className="text-sm font-medium text-foreground mb-2">
-        {tools.length ? `It will be able to use these tools in ${appName}:` : "No tools requested"}
-      </p>
-      {tools.length > 0 && (
-        <ul className="space-y-2 text-sm mb-6">
-          {tools.map((tool) => (
-            <li key={tool.name} className="flex flex-col">
-              <span className="text-foreground font-medium">
-                {tool.title || tool.name}
-              </span>
-              {tool.description && (
-                <span className="text-muted-foreground">{tool.description}</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+    .logo-zone {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-      <div className="flex gap-3">
-        <Button
-          variant="outline"
-          className="flex-1 h-12 font-medium"
-          disabled={submitting}
-          onClick={() => respond("deny")}
-        >
-          Deny
-        </Button>
-        <Button
-          className="flex-1 h-12 font-medium"
-          disabled={submitting}
-          onClick={() => respond("approve")}
-        >
-          {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-          Approve
-        </Button>
+    .logo {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 900;
+      font-size: 1.1rem;
+      letter-spacing: 2px;
+      color: var(--accent-color);
+      text-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .sys-badge {
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-color);
+      color: var(--accent-color);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: var(--accent-color);
+      box-shadow: 0 0 8px var(--accent-color);
+    }
+
+    .status-dot.offline {
+      background-color: var(--danger);
+      box-shadow: 0 0 8px var(--danger);
+    }
+
+    .view-content {
+      flex: 1;
+      position: relative;
+      overflow-y: auto;
+      display: none;
+      padding: 15px;
+    }
+
+    .view-content.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    #home-view {
+      align-items: center;
+      justify-content: space-between;
+      text-align: center;
+      padding-bottom: 20px;
+    }
+
+    #orb-container {
+      width: 240px;
+      height: 240px;
+      position: relative;
+      cursor: pointer;
+      margin: 10px 0;
+    }
+
+    .hud-metrics {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      padding: 8px;
+      border-radius: 8px;
+      text-align: center;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .metric-card .title {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+    }
+
+    .metric-card .value {
+      font-size: 0.85rem;
+      color: var(--accent-color);
+      margin-top: 2px;
+    }
+
+    .voice-status {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.85rem;
+      color: var(--accent-color);
+      letter-spacing: 1px;
+      min-height: 20px;
+    }
+
+    .quick-actions {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+      overflow-x: auto;
+      padding-bottom: 5px;
+    }
+
+    .quick-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .quick-btn:active {
+      border-color: var(--accent-color);
+      color: var(--accent-color);
+    }
+
+    .timer-widget {
+      padding: 8px 16px;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      display: none;
+      font-family: 'Orbitron', sans-serif;
+      color: var(--accent-color);
+      font-size: 0.85rem;
+    }
+
+    #chat-view {
+      padding: 10px;
+      gap: 10px;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-bottom: 5px;
+    }
+
+    .message {
+      max-width: 88%;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      line-height: 1.45;
+      word-break: break-word;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: rgba(0, 243, 255, 0.12);
+      border: 1px solid rgba(0, 243, 255, 0.3);
+      border-bottom-right-radius: 2px;
+    }
+
+    .message.assistant {
+      align-self: flex-start;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-bottom-left-radius: 2px;
+    }
+
+    pre {
+      background: #020408;
+      padding: 8px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin-top: 6px;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.75rem;
+      border: 1px solid var(--border-color);
+      position: relative;
+    }
+
+    .copy-code-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      color: var(--accent-color);
+      font-size: 0.6rem;
+      padding: 2px 5px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .message-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 5px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .message-actions i {
+      cursor: pointer;
+    }
+
+    .message-actions i:hover {
+      color: var(--accent-color);
+    }
+
+    .input-container {
+      padding: 8px 12px;
+      background: rgba(8, 9, 13, 0.95);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .image-preview {
+      position: absolute;
+      bottom: 55px;
+      left: 12px;
+      max-width: 70px;
+      max-height: 70px;
+      border-radius: 6px;
+      border: 1px solid var(--accent-color);
+      display: none;
+    }
+
+    .input-container input[type="text"] {
+      flex: 1;
+      background: rgba(15, 20, 31, 0.9);
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      padding: 8px 14px;
+      color: var(--text-main);
+      font-family: inherit;
+      outline: none;
+      font-size: 0.9rem;
+    }
+
+    .input-container input[type="text"]:focus {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 6px var(--accent-glow);
+    }
+
+    .btn-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border-color);
+      background: rgba(15, 20, 31, 0.9);
+      color: var(--accent-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.85rem;
+    }
+
+    .btn-icon:active {
+      transform: scale(0.92);
+      background: var(--accent-color);
+      color: #000;
+    }
+
+    .btn-icon.recording {
+      background: var(--danger);
+      color: white;
+      border-color: var(--danger);
+      box-shadow: 0 0 8px var(--danger);
+    }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .tool-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      padding: 12px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tool-card h4 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.8rem;
+      color: var(--accent-color);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .todo-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.8rem;
+    }
+
+    .terminal-box {
+      background: #000;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.7rem;
+      height: 120px;
+      overflow-y: auto;
+      color: var(--accent-color);
+    }
+
+    .settings-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .setting-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .setting-item label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .setting-item input, .setting-item select {
+      background: rgba(15, 20, 31, 0.9);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.85rem;
+    }
+
+    .toggle-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-direction: row;
+    }
+
+    nav {
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 0;
+      background: rgba(8, 9, 13, 0.95);
+      border-top: 1px solid var(--border-color);
+    }
+
+    .nav-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.65rem;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .nav-btn i {
+      font-size: 1.1rem;
+    }
+
+    .nav-btn.active {
+      color: var(--accent-color);
+      text-shadow: 0 0 8px var(--accent-glow);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <header>
+      <div class="logo-zone">
+        <i class="fa-solid fa-microchip" style="color: var(--accent-color);"></i>
+        <div class="logo">JARVIS</div>
       </div>
-    </AuthLayout>
-  );
-}
+      <div class="header-actions">
+        <button class="btn-icon" id="sos-btn" title="SOS Posizione" style="width:28px; height:28px; font-size:0.75rem; border-color: var(--danger); color: var(--danger);">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </button>
+        <button class="btn-icon" id="weather-btn" title="Meteo GPS" style="width:28px; height:28px; font-size:0.75rem;">
+          <i class="fa-solid fa-cloud-sun"></i>
+        </button>
+        <div class="sys-badge">
+          <div class="status-dot" id="status-dot"></div>
+          <span id="status-text">ONLINE</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Home View / HUD Engine -->
+    <main id="home-view" class="view-content active">
+      <div class="hud-metrics">
+        <div class="metric-card">
+          <div class="title">BATTERIA</div>
+          <div class="value" id="bat-val">--%</div>
+        </div>
+        <div class="metric-card">
+          <div class="title">MEMORIA</div>
+          <div class="value" id="mem-val">OK</div>
+        </div>
+        <div class="metric-card">
+          <div class="title">PING</div>
+          <div class="value" id="ping-val">-- ms</div>
+        </div>
+      </div>
+
+      <div id="orb-container"></div>
+      
+      <div class="voice-status" id="voice-status">In attesa del comando...</div>
+
+      <div class="timer-widget" id="timer-widget">
+        <i class="fa-solid fa-stopwatch"></i> <span id="timer-display">00:00</span>
+      </div>
+
+      <div class="quick-actions">
+        <button class="quick-btn" onclick="executeQuickAction('Analizza lo stato attuale del sistema')"><i class="fa-solid fa-chart-line"></i> Diagnostica</button>
+        <button class="quick-btn" onclick="executeQuickAction('Avvia Pomodoro timer di 25 minuti')"><i class="fa-solid fa-business-time"></i> Focus 25m</button>
+        <button class="quick-btn" onclick="executeQuickAction('Traduci istantaneamente il prossimo testo')"><i class="fa-solid fa-language"></i> Traduttore</button>
+        <button class="quick-btn" onclick="executeQuickAction('Genera una mappa concettuale')"><i class="fa-solid fa-sitemap"></i> Diagramma</button>
+      </div>
+    </main>
+
+    <!-- Chat View -->
+    <main id="chat-view" class="view-content">
+      <div class="chat-messages" id="chat-messages"></div>
+      <img id="image-preview" class="image-preview" alt="Anteprima">
+      <div class="input-container">
+        <label for="file-input" class="btn-icon">
+          <i class="fa-solid fa-paperclip"></i>
+        </label>
+        <input type="file" id="file-input" accept="image/*,.pdf,.txt" style="display:none;">
+        <input type="text" id="chat-input" placeholder="Comando o domanda per Jarvis..." autocomplete="off">
+        <button class="btn-icon" id="mic-btn">
+          <i class="fa-solid fa-microphone"></i>
+        </button>
+        <button class="btn-icon" id="send-btn">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </div>
+    </main>
+
+    <!-- Tools View -->
+    <main id="tools-view" class="view-content">
+      <div class="tools-grid">
+        <div class="tool-card" style="grid-column: span 2;">
+          <h4><i class="fa-solid fa-terminal"></i> Shell Emulator</h4>
+          <div class="terminal-box" id="terminal-output">> JARVIS Kernel Loaded. Ready.<br></div>
+        </div>
+        
+        <div class="tool-card">
+          <h4><i class="fa-solid fa-list-check"></i> Task Board</h4>
+          <div id="todo-list" style="max-height: 100px; overflow-y: auto;"></div>
+          <input type="text" id="todo-input" placeholder="Nuovo task..." style="background:none; border: 1px solid var(--border-color); color:var(--text-main); padding: 4px; border-radius: 4px; font-size:0.75rem;">
+        </div>
+
+        <div class="tool-card">
+          <h4><i class="fa-solid fa-house-signal"></i> IoT Control</h4>
+          <button class="quick-btn" onclick="toggleIoT('Luci Soggiorno')" style="justify-content: center;">Luci: OFF</button>
+          <button class="quick-btn" onclick="toggleIoT('Termostato')" style="justify-content: center;">Termo: 21°C</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Config View -->
+    <main id="settings-view" class="view-content">
+      <div class="settings-group">
+        <div class="setting-item">
+          <label for="api-key">Chiave API Gemini</label>
+          <input type="password" id="api-key" placeholder="Inserisci API Key">
+        </div>
+        
+        <div class="setting-item">
+          <label for="model-select">Modello AI</label>
+          <select id="model-select">
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Ultra-Veloce)</option>
+            <option value="gemini-2.5-pro">Gemini 2.5 Pro (Ragionamento Avanzato)</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <label for="theme-select">Tema HUD Interface</label>
+          <select id="theme-select">
+            <option value="cyan">Cyan Neon (Default)</option>
+            <option value="red">Red Protocol (Iron Man)</option>
+            <option value="green">Emerald Grid</option>
+            <option value="matrix">Matrix Cyber Deck</option>
+          </select>
+        </div>
+
+        <div class="setting-item toggle-container">
+          <label>Wake Word ("Jarvis")</label>
+          <input type="checkbox" id="wakeword-toggle">
+        </div>
+
+        <div class="setting-item toggle-container">
+          <label>Sintesi Vocale Auto</label>
+          <input type="checkbox" id="tts-toggle" checked>
+        </div>
+
+        <div class="setting-item toggle-container">
+          <label>Ghost Mode (Privacy Shield)</label>
+          <input type="checkbox" id="ghost-toggle">
+        </div>
+
+        <button id="save-settings" class="btn-icon" style="width: 100%; border-radius: 8px; font-family:'Orbitron'; font-size: 0.8rem; margin-top: 10px;">SALVA CONFIGURAZIONE</button>
+        <button id="clear-cache" class="btn-icon" style="width: 100%; border-radius: 8px; font-family:'Orbitron'; font-size: 0.75rem; border-color: var(--danger); color: var(--danger);">SVUOTA CACHE / CRONOLOGIA</button>
+      </div>
+    </main>
+
+    <nav>
+      <button class="nav-btn active" data-target="home-view">
+        <i class="fa-solid fa-atom"></i>
+        <span>HUD</span>
+      </button>
+      <button class="nav-btn" data-target="chat-view">
+        <i class="fa-solid fa-message"></i>
+        <span>CHAT</span>
+      </button>
+      <button class="nav-btn" data-target="tools-view">
+        <i class="fa-solid fa-cubes"></i>
+        <span>UTILITY</span>
+      </button>
+      <button class="nav-btn" data-target="settings-view">
+        <i class="fa-solid fa-sliders"></i>
+        <span>CONFIG</span>
+      </button>
+    </nav>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       1. STATO GLOBALE E CORE ENGINE
+       ========================================================================== */
+    const state = {
+      apiKey: localStorage.getItem('jarvis_api_key') || '',
+      model: localStorage.getItem('jarvis_model') || 'gemini-2.5-flash',
+      theme: localStorage.getItem('jarvis_theme') || 'cyan',
+      ttsEnabled: localStorage.getItem('jarvis_tts') !== 'false',
+      wakeWordEnabled: localStorage.getItem('jarvis_wakeword') === 'true',
+      ghostMode: localStorage.getItem('jarvis_ghost') === 'true',
+      history: JSON.parse(localStorage.getItem('jarvis_history') || '[]'),
+      todos: JSON.parse(localStorage.getItem('jarvis_todos') || '[]'),
+      currentImageBase64: null,
+      isListening: false,
+      isSpeaking: false,
+      activeTimer: null
+    };
+
+    const SYSTEM_INSTRUCTION = "Sei JARVIS, un'IA ad altissima precisione. Rispondi in modo conciso, elegante e diretto. Zero convenevoli o preamboli. Formatta in Markdown. Se richiesto un diagramma, usa la sintassi mermaid.";
+
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+
+    function applyTheme(themeName) {
+      document.body.className = '';
+      if(themeName === 'red') document.body.classList.add('theme-red');
+      if(themeName === 'green') document.body.classList.add('theme-green');
+      if(themeName === 'matrix') document.body.classList.add('theme-matrix');
+    }
+    applyTheme(state.theme);
+
+    function triggerHaptic() {
+      if (navigator.vibrate) navigator.vibrate(15);
+    }
+
+    function sysLog(msg) {
+      const term = document.getElementById('terminal-output');
+      if (term) {
+        term.innerHTML += `> ${msg}<br>`;
+        term.scrollTop = term.scrollHeight;
+      }
+    }
+
+    /* ==========================================================================
+       2. NAVIGATION & INTERFACE MANAGEMENT
+       ========================================================================== */
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        triggerHaptic();
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.view-content').forEach(v => v.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.target).classList.add('active');
+      });
+    });
+
+    // Diagnostica di Sistema Live
+    function updateMetrics() {
+      if (navigator.getBattery) {
+        navigator.getBattery().then(bat => {
+          document.getElementById('bat-val').innerText = Math.round(bat.level * 100) + '%';
+        });
+      }
+      
+      const start = Date.now();
+      fetch('https://www.google.com/favicon.ico', { mode: 'no-cors', cache: 'no-store' })
+        .then(() => {
+          const ping = Date.now() - start;
+          document.getElementById('ping-val').innerText = ping + ' ms';
+          document.getElementById('status-dot').classList.remove('offline');
+          document.getElementById('status-text').innerText = 'ONLINE';
+        })
+        .catch(() => {
+          document.getElementById('status-dot').classList.add('offline');
+          document.getElementById('status-text').innerText = 'OFFLINE';
+        });
+    }
+    setInterval(updateMetrics, 10000);
+    updateMetrics();
+
+    /* ==========================================================================
+       3. THREE.JS ORB 3D HIGH-PERFORMANCE
+       ========================================================================== */
+    let scene, camera, renderer, sphere;
+    function init3DOrb() {
+      const container = document.getElementById('orb-container');
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+      
+      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.setSize(240, 240);
+      container.appendChild(renderer.domElement);
+
+      const geometry = new THREE.IcosahedronGeometry(1.1, 3);
+      const material = new THREE.MeshBasicMaterial({
+        color: 0x00f3ff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.85
+      });
+      
+      sphere = new THREE.Mesh(geometry, material);
+      scene.add(sphere);
+      camera.position.z = 2.4;
+
+      function animate() {
+        requestAnimationFrame(animate);
+        sphere.rotation.x += 0.004;
+        sphere.rotation.y += 0.006;
+
+        if (state.isSpeaking) {
+          const scale = 1 + Math.sin(Date.now() * 0.012) * 0.18;
+          sphere.scale.set(scale, scale, scale);
+        } else if (state.isListening) {
+          const scale = 1 + Math.sin(Date.now() * 0.02) * 0.08;
+          sphere.scale.set(scale, scale, scale);
+        } else {
+          sphere.scale.set(1, 1, 1);
+        }
+        
+        renderer.render(scene, camera);
+      }
+      animate();
+    }
+    init3DOrb();
+
+    /* ==========================================================================
+       4. LOW-LATENCY AUDIO & LOCAL FAST-ROUTING
+       ========================================================================== */
+    function playBeep(freq = 800, duration = 0.08) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freq;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
+        osc.stop(ctx.currentTime + duration);
+      } catch(e) {}
+    }
+
+    function checkLocalCommands(text) {
+      const lower = text.toLowerCase();
+      
+      if (lower.includes("timer") || lower.includes("minuti") || lower.includes("secondi")) {
+        const matchMin = lower.match(/(\d+)\s*minut/);
+        const matchSec = lower.match(/(\d+)\s*second/);
+        let secondsTotal = 0;
+        if (matchMin) secondsTotal += parseInt(matchMin[1]) * 60;
+        if (matchSec) secondsTotal += parseInt(matchSec[1]);
+
+        if (secondsTotal > 0) {
+          startTimer(secondsTotal);
+          return `Timer impostato: ${secondsTotal} secondi.`;
+        }
+      }
+
+      if (lower.includes("cambia tema in")) {
+        if (lower.includes("rosso")) { applyTheme('red'); return "Tema Red Protocol attivato."; }
+        if (lower.includes("verde")) { applyTheme('green'); return "Tema Emerald Grid attivato."; }
+        if (lower.includes("matrix")) { applyTheme('matrix'); return "Tema Matrix Cyber Deck attivato."; }
+        if (lower.includes("cyan") || lower.includes("blu")) { applyTheme('cyan'); return "Tema Cyan Neon attivato."; }
+      }
+
+      if (lower.includes("pulisci cronologia") || lower.includes("svuota cache")) {
+        clearAllCache();
+        return "Cache e cronologia azzerate.";
+      }
+
+      return null;
+    }
+
+    function startTimer(durationSeconds) {
+      if (state.activeTimer) clearInterval(state.activeTimer);
+      const widget = document.getElementById('timer-widget');
+      const display = document.getElementById('timer-display');
+      widget.style.display = 'inline-block';
+      
+      let timer = durationSeconds;
+      state.activeTimer = setInterval(() => {
+        let minutes = parseInt(timer / 60, 10);
+        let seconds = parseInt(timer % 60, 10);
+        display.textContent = (minutes < 10 ? "0" : "") + minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
+
+        if (--timer < 0) {
+          clearInterval(state.activeTimer);
+          display.textContent = "SCADUTO!";
+          playBeep(1200, 0.8);
+          if (state.ttsEnabled) speakText("Tempo scaduto.");
+        }
+      }, 1000);
+    }
+
+    // SOS Geolocalizzato
+    document.getElementById('sos-btn').addEventListener('click', () => {
+      triggerHaptic();
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const alertMsg = `EMERGENZA SOS! Posizione attuale: https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
+          navigator.clipboard.writeText(alertMsg);
+          alert("Coordinate SOS copiate negli appunti:\n" + alertMsg);
+          sysLog("SOS Triggered: Position copied.");
+        });
+      }
+    });
+
+    // Meteo GPS
+    document.getElementById('weather-btn').addEventListener('click', () => {
+      triggerHaptic();
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          try {
+            const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&current_weather=true`);
+            const data = await res.json();
+            const w = data.current_weather;
+            const reply = `Meteo GPS: ${w.temperature}°C, Vento ${w.windspeed} km/h.`;
+            appendMessage('assistant', reply);
+            if (state.ttsEnabled) speakText(reply);
+          } catch(e) {
+            alert("Errore meteo.");
+          }
+        });
+      }
+    });
+
+    /* ==========================================================================
+       5. STREAMING API GEMINI & CODE PARSER
+       ========================================================================== */
+    async function sendToGeminiStream(promptText, onChunk) {
+      if (!state.apiKey) {
+        alert("Inserisci l'API Key nelle Impostazioni.");
+        return;
+      }
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${state.model}:streamGenerateContent?alt=sse&key=${state.apiKey}`;
+
+      const contents = [];
+      state.history.slice(-6).forEach(msg => {
+        contents.push({
+          role: msg.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.text }]
+        });
+      });
+
+      const currentParts = [{ text: promptText }];
+      if (state.currentImageBase64) {
+        currentParts.push({
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: state.currentImageBase64.split(',')[1]
+          }
+        });
+      }
+
+      contents.push({ role: 'user', parts: currentParts });
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: contents,
+            systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] }
+          })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let fullText = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          
+          const lines = chunk.split("\n");
+          for (let line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.replace("data: ", ""));
+                const textChunk = data.candidates[0]?.content?.parts[0]?.text || "";
+                fullText += textChunk;
+                onChunk(fullText);
+              } catch (e) {}
+            }
+          }
+        }
+        return fullText;
+      } catch (err) {
+        sysLog("API Error: " + err.message);
+        return "Errore di comunicazione con il core AI.";
+      }
+    }
+
+    /* ==========================================================================
+       6. CHAT PARSER & MERMAID GRAPHICS
+       ========================================================================== */
+    const chatMessagesContainer = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+    const fileInput = document.getElementById('file-input');
+    const imagePreview = document.getElementById('image-preview');
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          state.currentImageBase64 = evt.target.result;
+          imagePreview.src = state.currentImageBase64;
+          imagePreview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    function parseCustomMarkdown(text) {
+      if (text.includes("```mermaid")) {
+        const parts = text.split("```mermaid");
+        const graphCode = parts[1].split("```")[0];
+        setTimeout(() => {
+          try { mermaid.contentLoaded(); } catch(e){}
+        }, 200);
+        return `${parts[0]}<div class="mermaid">${graphCode}</div>${parts[1].split("```")[1] || ''}`;
+      }
+
+      if (text.includes("```")) {
+        const parts = text.split("```");
+        let html = "";
+        parts.forEach((part, index) => {
+          if (index % 2 === 1) {
+            html += `<pre><code>${part}</code><button class="copy-code-btn" onclick="navigator.clipboard.writeText(this.previousSibling.innerText); playBeep(1000,0.05);">Copia</button></pre>`;
+          } else {
+            html += part;
+          }
+        });
+        return html;
+      }
+      return text;
+    }
+
+    function appendMessage(sender, text = "") {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `message ${sender}`;
+      msgDiv.innerHTML = parseCustomMarkdown(text);
+
+      if (sender === 'assistant') {
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'message-actions';
+        actionsDiv.innerHTML = `<i class="fa-regular fa-copy" title="Copia"></i>`;
+        actionsDiv.querySelector('.fa-copy').addEventListener('click', () => {
+          navigator.clipboard.writeText(msgDiv.innerText);
+          playBeep(1000, 0.05);
+        });
+        msgDiv.appendChild(actionsDiv);
+      }
+
+      chatMessagesContainer.appendChild(msgDiv);
+      chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+      return msgDiv;
+    }
+
+    async function handleUserSend(textOverride = null) {
+      const text = textOverride || chatInput.value.trim();
+      if (!text && !state.currentImageBase64) return;
+
+      triggerHaptic();
+      appendMessage('user', text);
+      chatInput.value = '';
+      imagePreview.style.display = 'none';
+      const promptText = text;
+      state.currentImageBase64 = null;
+
+      playBeep(600, 0.05);
+
+      const localReply = checkLocalCommands(promptText);
+      if (localReply) {
+        appendMessage('assistant', localReply);
+        if (state.ttsEnabled) speakText(localReply);
+        return;
+      }
+
+      const assistantMsgDiv = appendMessage('assistant', '...');
+      
+      const fullResponse = await sendToGeminiStream(promptText, (partialText) => {
+        assistantMsgDiv.innerHTML = parseCustomMarkdown(partialText);
+        chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+      });
+
+      if (!state.ghostMode) {
+        state.history.push({ sender: 'user', text: promptText });
+        state.history.push({ sender: 'assistant', text: fullResponse });
+        localStorage.setItem('jarvis_history', JSON.stringify(state.history));
+      }
+
+      if (state.ttsEnabled) speakText(fullResponse);
+    }
+
+    function executeQuickAction(prompt) {
+      document.querySelector('[data-target="chat-view"]').click();
+      handleUserSend(prompt);
+    }
+
+    sendBtn.addEventListener('click', () => handleUserSend());
+    chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleUserSend(); });
+
+    /* ==========================================================================
+       7. HIGH-PRECISION SPEECH RECOGNITION & TTS
+       ========================================================================== */
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.lang = 'it-IT';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        state.isListening = true;
+        document.getElementById('mic-btn').classList.add('recording');
+        document.getElementById('voice-status').innerText = 'Ascolto in corso...';
+        playBeep(900, 0.08);
+      };
+
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          interimTranscript += event.results[i][0].transcript;
+        }
+        chatInput.value = interimTranscript;
+        document.getElementById('voice-status').innerText = `"${interimTranscript}"`;
+
+        if (event.results[0].isFinal) {
+          handleUserSend(interimTranscript);
+        }
+      };
+
+      recognition.onend = () => {
+        state.isListening = false;
+        document.getElementById('mic-btn').classList.remove('recording');
+      };
+    }
+
+    document.getElementById('mic-btn').addEventListener('click', () => {
+      if (recognition && !state.isListening) recognition.start();
+    });
+
+    document.getElementById('orb-container').addEventListener('click', () => {
+      if (recognition && !state.isListening) recognition.start();
+    });
+
+    function speakText(text) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+
+      const cleanText = text.replace(/```[\s\S]*?```/g, "Codice elaborato.");
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.lang = 'it-IT';
+      utterance.pitch = 0.95;
+      utterance.rate = 1.05;
+
+      utterance.onstart = () => { state.isSpeaking = true; };
+      utterance.onend = () => { state.isSpeaking = false; };
+
+      window.speechSynthesis.speak(utterance);
+    }
+
+    /* ==========================================================================
+       8. TASK BOARD & CONFIG MANAGEMENT
+       ========================================================================== */
+    function renderTodos() {
+      const container = document.getElementById('todo-list');
+      container.innerHTML = '';
+      state.todos.forEach((todo, idx) => {
+        container.innerHTML += `
+          <div class="todo-item">
+            <span>${todo}</span>
+            <i class="fa-solid fa-xmark" style="color:var(--danger); cursor:pointer;" onclick="deleteTodo(${idx})"></i>
+          </div>
+        `;
+      });
+    }
+
+    document.getElementById('todo-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && e.target.value.trim()) {
+        state.todos.push(e.target.value.trim());
+        localStorage.setItem('jarvis_todos', JSON.stringify(state.todos));
+        e.target.value = '';
+        renderTodos();
+      }
+    });
+
+    function deleteTodo(idx) {
+      state.todos.splice(idx, 1);
+      localStorage.setItem('jarvis_todos', JSON.stringify(state.todos));
+      renderTodos();
+    }
+
+    function toggleIoT(device) {
+      triggerHaptic();
+      playBeep(1100, 0.05);
+      sysLog(`IoT Triggered: ${device}`);
+    }
+
+    function clearAllCache() {
+      localStorage.clear();
+      state.history = [];
+      state.todos = [];
+      chatMessagesContainer.innerHTML = '';
+      renderTodos();
+      alert("Memoria azzerata.");
+    }
+
+    document.getElementById('clear-cache').addEventListener('click', clearAllCache);
+
+    // Save Settings
+    document.getElementById('save-settings').addEventListener('click', () => {
+      triggerHaptic();
+      state.apiKey = document.getElementById('api-key').value.trim();
+      state.model = document.getElementById('model-select').value;
+      state.theme = document.getElementById('theme-select').value;
+      state.ttsEnabled = document.getElementById('tts-toggle').checked;
+      state.ghostMode = document.getElementById('ghost-toggle').checked;
+
+      localStorage.setItem('jarvis_api_key', state.apiKey);
+      localStorage.setItem('jarvis_model', state.model);
+      localStorage.setItem('jarvis_theme', state.theme);
+      localStorage.setItem('jarvis_tts', state.ttsEnabled);
+      localStorage.setItem('jarvis_ghost', state.ghostMode);
+
+      applyTheme(state.theme);
+      alert('Configurazione salvata.');
+    });
+
+    // Init inputs
+    document.getElementById('api-key').value = state.apiKey;
+    document.getElementById('model-select').value = state.model;
+    document.getElementById('theme-select').value = state.theme;
+    document.getElementById('tts-toggle').checked = state.ttsEnabled;
+    document.getElementById('ghost-toggle').checked = state.ghostMode;
+
+    state.history.forEach(msg => appendMessage(msg.sender, msg.text));
+    renderTodos();
+  </script>
+</body>
+</html>
 
 
     
